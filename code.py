@@ -1,3 +1,5 @@
+# PyPortal Picture Parade
+
 import time
 import board
 import displayio
@@ -45,12 +47,22 @@ def show_image(image_file):
         display.root_group = group
 
     except OSError as e:
+        # Log the error and skip to the next file
         print(f"Error loading image {image_file}: {e}")
+        print("Skipping to the next image.")
+    except MemoryError as e:
+        # Handle memory issues gracefully
+        print(f"Memory error while loading {image_file}: {e}")
+        print("Clearing memory and attempting recovery...")
+        display.root_group = None
+        time.sleep(1)  # Add a delay to stabilize
 
+# Main loop for the slideshow
 # Main loop for the slideshow
 while True:
     for image_file in IMAGE_FILES:
         full_path = IMAGE_FOLDER + image_file  # Build the full file path
-        print(f"Loading image: {full_path}")
-        show_image(full_path)  # Show the image
+        print(f"Attempting to load image: {full_path}")
+        show_image(full_path)  # Attempt to show the image
         time.sleep(3)  # Display each image for 3 seconds
+
