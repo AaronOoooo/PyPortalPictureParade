@@ -1,8 +1,9 @@
+import os
 import time
 import board
 import displayio
 import adafruit_imageload
-import os
+from adafruit_touchscreen import Touchscreen
 
 # Folder containing images
 IMAGE_FOLDER = "/images/"
@@ -11,62 +12,105 @@ IMAGE_FOLDER = "/images/"
 IMAGE_FILES = [
     f for f in os.listdir(IMAGE_FOLDER) if f.lower().endswith(".bmp")
 ]
-IMAGE_FILES.sort()  # Sort files alphabetically for consistent order
+IMAGE_FILES.sort()
 
 if not IMAGE_FILES:
     raise RuntimeError("No .bmp files found in the /images/ directory!")
 else:
     print(f"Found {len(IMAGE_FILES)} image(s) in the folder.")
 
-# Display setup
+# Display and Touchscreen setup
 display = board.DISPLAY
+touch = Touchscreen(
+    board.TOUCH_XL, board.TOUCH_XR, board.TOUCH_YD, board.TOUCH_YU,
+    calibration=None, size=(320, 240)
+)
 
-# Transition Functions
-def fade_out():
-    """Gradually decrease screen brightness to create a fade-out effect."""
-    for i in range(255, -1, -10):  # Gradually decrease brightness
-        display.brightness = i / 255.0
-        time.sleep(0.2)  # Adjust delay for smoother or faster fade
-    display.brightness = 0
+# Button Definitions
+BUTTON_WIDTH = 80
+BUTTON_HEIGHT = 40
+BUTTON_Y = 200  # Position near the bottom of the screen
 
-def fade_in():
-    """Gradually increase screen brightness to create a fade-in effect."""
-    for i in range(0, 256, 10):  # Gradually increase brightness
-        display.brightness = i / 255.0
-        time.sleep(0.2)  # Adjust delay for smoother or faster fade
-    display.brightness = 1.0
+buttons = {
+    "previous": {"x": 20, "y": BUTTON_Y, "color": 0xFF0000},
+    "pause": {"x": 120, "y": BUTTON_Y, "color": 0x00FF00},
+    "next": {"x": 220, "y": BUTTON_Y, "color": 0x0000FF},
+}
 
-# Function to load and display an image with fade transitions
-def show_image(image_file):
+def create_button_group():
+    """Create a new button group."""
+    button_group = displayio.Group()
+    for label, props in buttons.items():
+        # Create a colored button rectangle
+        button = displayio.TileGrid(
+            displayio.Bitmap(BUTTON_WIDTH, BUTTON_HEIGHT, 1),
+            pixel_shader=displayio.Palette(1),
+            x=props["x"],
+            y=props["y"]
+        )
+        button.pixel_shader[0] = props["color"]  # Set button color
+        button_group.append(button)
+    return button_group
+
+
+def show_image(index):
+    """Load and display an image based on the index."""
     try:
-        # Fade out the current screen before loading the next image
-        fade_out()
-        display.root_group = None  # Free up memory
+        # Reset the display root group to free memory
+        display.root_group = None
 
         # Load the BMP image
+        image_file = IMAGE_FOLDER + IMAGE_FILES[index]
         with open(image_file, "rb") as file:
             image, palette = adafruit_imageload.load(
                 file, bitmap=displayio.Bitmap, palette=displayio.Palette
             )
 
-        # Create the TileGrid and group
+        # Create a new TileGrid and Group for the image
         tile_grid = displayio.TileGrid(image, pixel_shader=palette)
         group = displayio.Group()
         group.append(tile_grid)
 
-        # Show the image
+        # Create a fresh button group and add to the group
+        fresh_button_group = create_button_group()
+        group.append(fresh_button_group)
+
+        # Assign the new group to the display
         display.root_group = group
 
-        # Fade in the new image
-        fade_in()
-
     except OSError as e:
-        print(f"Error loading image {image_file}: {e}")
+        print(f"Error loading image: {e}")
+
+def handle_touch():
+    """Handle touchscreen presses and map them to button actions."""
+    global current_image_index, paused
+    touch_point = touch.touch_point
+    if touch_point:
+        x, y, z = touch_point  # Extract touch coordinates
+        if buttons["previous"]["x"] <= x <= buttons["previous"]["x"] + BUTTON_WIDTH and \
+           buttons["previous"]["y"] <= y <= buttons["previous"]["y"] + BUTTON_HEIGHT:
+            print("Previous button pressed")
+            current_image_index = (current_image_index - 1) % len(IMAGE_FILES)
+            show_image(current_image_index)
+        elif buttons["next"]["x"] <= x <= buttons["next"]["x"] + BUTTON_WIDTH and \
+             buttons["next"]["y"] <= y <= buttons["next"]["y"] + BUTTON_HEIGHT:
+            print("Next button pressed")
+            current_image_index = (current_image_index + 1) % len(IMAGE_FILES)
+            show_image(current_image_index)
+        elif buttons["pause"]["x"] <= x <= buttons["pause"]["x"] + BUTTON_WIDTH and \
+             buttons["pause"]["y"] <= y <= buttons["pause"]["y"] + BUTTON_HEIGHT:
+            print("Pause/Resume button pressed")
+            paused = not paused  # Toggle paused state
+
+# Display state variables
+current_image_index = 0
+paused = False
 
 # Main loop for the slideshow
+show_image(current_image_index)  # Show the first image
 while True:
-    for image_file in IMAGE_FILES:
-        full_path = IMAGE_FOLDER + image_file  # Build the full file path
-        print(f"Attempting to load image: {full_path}")
-        show_image(full_path)  # Display the image with fade transitions
-        time.sleep(3)  # Display each image for 3 seconds
+    handle_touch()  # Check for button presses
+    if not paused:
+        time.sleep(3)  # Wait before showing the next image
+        current_image_index = (current_image_index + 1) % len(IMAGE_FILES)
+        show_image(current_image_index)
