@@ -32,9 +32,9 @@ BUTTON_HEIGHT = 40
 BUTTON_Y = 200  # Position near the bottom of the screen
 
 buttons = {
-    "previous": {"x": 20, "y": BUTTON_Y, "color": 0xFF0000},
-    "pause": {"x": 120, "y": BUTTON_Y, "color": 0x00FF00},
-    "next": {"x": 220, "y": BUTTON_Y, "color": 0x0000FF},
+    "previous": {"x": 20, "y": BUTTON_Y, "color": 0xFF0000, "label": "Previous"},
+    "pause": {"x": 120, "y": BUTTON_Y, "color": 0x00FF00, "label": "Pause"},
+    "next": {"x": 220, "y": BUTTON_Y, "color": 0x0000FF, "label": "Next"},
 }
 
 def create_button_group():
@@ -42,16 +42,12 @@ def create_button_group():
     button_group = displayio.Group()
     for label, props in buttons.items():
         # Create a colored button rectangle
-        button = displayio.TileGrid(
-            displayio.Bitmap(BUTTON_WIDTH, BUTTON_HEIGHT, 1),
-            pixel_shader=displayio.Palette(1),
-            x=props["x"],
-            y=props["y"]
-        )
-        button.pixel_shader[0] = props["color"]  # Set button color
+        bitmap = displayio.Bitmap(BUTTON_WIDTH, BUTTON_HEIGHT, 1)
+        palette = displayio.Palette(1)
+        palette[0] = props["color"]
+        button = displayio.TileGrid(bitmap, pixel_shader=palette, x=props["x"], y=props["y"])
         button_group.append(button)
     return button_group
-
 
 def show_image(index):
     """Load and display an image based on the index."""
@@ -86,21 +82,22 @@ def handle_touch():
     global current_image_index, paused
     touch_point = touch.touch_point
     if touch_point:
-        x, y, z = touch_point  # Extract touch coordinates
-        if buttons["previous"]["x"] <= x <= buttons["previous"]["x"] + BUTTON_WIDTH and \
-           buttons["previous"]["y"] <= y <= buttons["previous"]["y"] + BUTTON_HEIGHT:
-            print("Previous button pressed")
-            current_image_index = (current_image_index - 1) % len(IMAGE_FILES)
-            show_image(current_image_index)
-        elif buttons["next"]["x"] <= x <= buttons["next"]["x"] + BUTTON_WIDTH and \
-             buttons["next"]["y"] <= y <= buttons["next"]["y"] + BUTTON_HEIGHT:
-            print("Next button pressed")
-            current_image_index = (current_image_index + 1) % len(IMAGE_FILES)
-            show_image(current_image_index)
-        elif buttons["pause"]["x"] <= x <= buttons["pause"]["x"] + BUTTON_WIDTH and \
-             buttons["pause"]["y"] <= y <= buttons["pause"]["y"] + BUTTON_HEIGHT:
-            print("Pause/Resume button pressed")
-            paused = not paused  # Toggle paused state
+        x, y, _ = touch_point  # Extract touch coordinates
+        for label, props in buttons.items():
+            if props["x"] <= x <= props["x"] + BUTTON_WIDTH and \
+               props["y"] <= y <= props["y"] + BUTTON_HEIGHT:
+                if label == "previous":
+                    print("Previous button pressed")
+                    current_image_index = (current_image_index - 1) % len(IMAGE_FILES)
+                    show_image(current_image_index)
+                elif label == "next":
+                    print("Next button pressed")
+                    current_image_index = (current_image_index + 1) % len(IMAGE_FILES)
+                    show_image(current_image_index)
+                elif label == "pause":
+                    print("Pause/Resume button pressed")
+                    paused = not paused  # Toggle paused state
+                return  # Exit loop after processing one touch
 
 # Display state variables
 current_image_index = 0
